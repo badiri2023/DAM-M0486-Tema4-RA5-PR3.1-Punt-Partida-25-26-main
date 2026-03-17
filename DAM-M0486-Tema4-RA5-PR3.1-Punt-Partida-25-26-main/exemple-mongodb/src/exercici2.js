@@ -11,7 +11,6 @@ if (!fs.existsSync(outDir)) {
 }
 
 // Generar PDF
-
 function generarPDF(nombreArchivo, titulos) {
     const doc = new PDFDocument();
     const filePath = path.join(outDir, nombreArchivo);
@@ -26,33 +25,31 @@ function generarPDF(nombreArchivo, titulos) {
     });
 
     doc.end();
-    console.log(`PDF generado: ${filePath}`);
+    console.log(`PDF generado en ${filePath}`);
 }
 
 // Excercici 2 part 1
-
-async function consultaViewCountMayorMedia(collection) {
-    console.log("Calculando media de ViewCount...");
+async function consultaVistas(collection) {
+    console.log("Calculant mitjana . . .");
 
     const media = await collection.aggregate([
-        { $group: { _id: null, mediaViews: { $avg: { $toInt: "$question.ViewCount" } } } }
-    ]).toArray();
-
-    const mediaViews = media[0].mediaViews;
-    console.log("Media de ViewCount:", mediaViews);
-
+        {$group:{_id: null, mediaViews:{$avg:{$toInt:"$question.ViewCount"}}}}]).toArray();
+    // hacemos la media pero sin decimales para que no nosd e 5 digitos de estos
+    const mediaViews = Math.round(media[0].mediaViews);
+    console.log("Mitjana de Vistas:", mediaViews);
+    
     const preguntas = await collection.find({
-        "question.ViewCount": { $gt: mediaViews.toString() }
+        $expr: {$gt: [{$toInt:"$question.ViewCount"}, mediaViews]}
     }).toArray();
 
-    console.log("Preguntas con ViewCount > media:", preguntas.length);
+    console.log("Preguntas amb vistas superiors a la mitjana:", preguntas.length);
 
     return preguntas.map(p => p.question.Title);
 }
 
 // Exercici 2 part 2
 
-async function consultaTitulosCoincidentes(collection) {
+async function consultaTitulos(collection) {
     const palabras = ["pug", "wig", "yak", "nap", "jig", "mug", "zap", "gag", "oaf", "elf"];
     const regex = new RegExp(palabras.join("|"), "i");
 
@@ -62,7 +59,7 @@ async function consultaTitulosCoincidentes(collection) {
         "question.Title": { $regex: regex }
     }).toArray();
 
-    console.log("Preguntas encontradas:", preguntas.length);
+    console.log("Preguntas trobades:", preguntas.length);
 
     return preguntas.map(p => p.question.Title);
 }
@@ -75,16 +72,16 @@ async function main() {
     try {
         await client.connect();
  
-        console.log("Conectado correctamente a MongoDB");
+        console.log("Conectat correctament a MongoDB");
 
         const db = client.db("chess_db");
         const collection = db.collection("questions");
 
-        // Ejecutar consultas
-        const titulos1 = await consultaViewCountMayorMedia(collection);
-        generarPDF("informe1.pdf", titulos1);
+        // Fem les consultes y las guardem en pdf
+        const titulos1 = await consultaVistas(collection);
+        const titulos2 = await consultaTitulos(collection);
 
-        const titulos2 = await consultaTitulosCoincidentes(collection);
+        generarPDF("informe1.pdf", titulos1);
         generarPDF("informe2.pdf", titulos2);
 
     } catch (error) {
